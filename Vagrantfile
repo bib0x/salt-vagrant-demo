@@ -5,10 +5,21 @@
 VAGRANTFILE_API_VERSION = "2"
 
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
-  os = "generic/ubuntu2004"
+  #os = "generic/ubuntu2004"
+  os = "debian/bookworm64"
   net_ip = "192.168.56"
 
+
   config.vm.define :master, primary: true do |master_config|
+
+    master_config.vm.provider "libvirt" do |lb|
+      lb.uri = 'qemu:///system'
+      lb.host = "master"
+      lb.memory = "2048"
+      lb.cpus = 1
+      lb.nested = true
+    end
+
     master_config.vm.provider "virtualbox" do |vb|
         vb.memory = "2048"
         vb.cpus = 1
@@ -18,8 +29,14 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     master_config.vm.box = "#{os}"
     master_config.vm.host_name = 'saltmaster.local'
     master_config.vm.network "private_network", ip: "#{net_ip}.10"
-    master_config.vm.synced_folder "saltstack/salt/", "/srv/salt"
-    master_config.vm.synced_folder "saltstack/pillar/", "/srv/pillar"
+    master_config.vm.synced_folder "saltstack/salt/", "/srv/salt",
+                                   type: "nfs",
+                                   nfs_version: 4,
+                                   nfs_udp: false
+    master_config.vm.synced_folder "saltstack/pillar/", "/srv/pillar",
+                                   type: "nfs",
+                                   nfs_version: 4,
+                                   nfs_udp: false
 
     master_config.vm.provision :salt do |salt|
       salt.master_config = "saltstack/etc/master"
@@ -47,6 +64,15 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     ["minion2",    "#{net_ip}.12",    "1024",    os ],
   ].each do |vmname,ip,mem,os|
     config.vm.define "#{vmname}" do |minion_config|
+
+      minion_config.vm.provider "libvirt" do |lb|
+        lb.uri = 'qemu:///system'
+        lb.host = "#{vmname}"
+        lb.memory = "#{mem}"
+        lb.cpus = 1
+        lb.nested = true
+      end
+
       minion_config.vm.provider "virtualbox" do |vb|
           vb.memory = "#{mem}"
           vb.cpus = 1
